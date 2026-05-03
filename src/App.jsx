@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { MapPin, Clock, ExternalLink, Calendar, Vote, Users, AlertCircle, Bell, Share2, ChevronRight, Info, Check, CalendarDays, List, DollarSign, TrendingUp, Sparkles, X, BellRing, ArrowUpRight, Mail, Phone, User, ThumbsUp, ThumbsDown, History, MapPinned, Globe, Flag, ShieldCheck, FileText, Heart, ArrowLeft, CheckCircle2, Building2, Accessibility } from "lucide-react";
 
-const TODAY = new Date(2026, 3, 29); // April 29, 2026 in local time (month is 0-indexed)
-const APP_VERSION = "0.4.2-prototype";
-const DATA_LAST_UPDATED = "April 29, 2026";
+const TODAY = new Date(2026, 4, 3); // May 3, 2026 in local time (month is 0-indexed)
+const APP_VERSION = "0.4.3-prototype";
+const DATA_LAST_UPDATED = "May 3, 2026";
 
 // Translations — Spanish included as demonstration of i18n approach
 const translations = {
@@ -633,7 +633,7 @@ function EventCard({ event, zip, nudged, state, registered, onNudge, onIntent, o
 }
 
 function CalendarView({ events, onEventClick }) {
-  const start = new Date(2026, 3, 19); // April 19, 2026 (Sunday in week before April 29)
+  const start = new Date(2026, 3, 26); // April 26, 2026 (Sunday in week before May 3)
   const days = Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const formatKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const eventsByDate = useMemo(() => { const map = {}; events.forEach((e) => { const key = e.deadline.split("T")[0]; if (!map[key]) map[key] = []; map[key].push(e); }); return map; }, [events]);
@@ -651,7 +651,7 @@ function CalendarView({ events, onEventClick }) {
         {days.map((day, i) => {
           const key = formatKey(day);
           const dayEvents = eventsByDate[key] || [];
-          const isToday = key === "2026-04-29";
+          const isToday = key === "2026-05-03";
           const isPast = day < TODAY && !isToday;
           const month = day.getMonth();
           return (
