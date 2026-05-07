@@ -94,15 +94,37 @@ const candidatesByEvent = {
   ],
 };
 
-const civicData = [
-  { id: "pb-vote-2026", category: "participatory_budgeting", title: "PB Cycle 15 — Voting Just Closed", subtitle: "Results expected late May · 22 Council Districts", description: "PB voting ran April 11–19. Winners will be announced by the NYC Council and included in the Fiscal Year 2027 budget. Watch the Legacy tab to see what your district funded once results land.", deadline: "2026-05-31T23:59:00", action: "See the cycle in progress", actionType: "reference", actionUrl: "https://council.nyc.gov/pb/", secondaryUrl: "https://council.nyc.gov/press/", urgency: "later", mobile: true, scope: "citywide", zips: ["all"], sourceLabel: "NYC Council", requiresRegistration: false, attribution: "multi_council", hasBallot: true, impact: { dollars: "$22M", text: "will fund schools, parks, libraries & street safety across 22 NYC districts in the FY2027 budget — results announced by the Council in late May", areas: ["Schools", "Parks", "Street safety"] }, calendar: { start: "2026-05-15T09:00:00", end: "2026-05-31T17:00:00" } },
-  { id: "d3-special-result", category: "election", title: "D3 Special Election — Carl Wilson Wins", subtitle: "Results in · Final RCV tabulation May 5", description: "Carl Wilson won the Council District 3 Special Election with ~43% of first-choice votes. Lindsey Boylan conceded election night. Wilson, the only openly gay candidate, will be the fifth gay member to represent the district, including Stonewall Inn. Final ranked-choice tabulation completes May 5.", deadline: "2026-05-05T17:00:00", action: "Read more", actionType: "reference", actionUrl: "https://www.thecity.nyc/2026/04/28/carl-wilson-defeats-mamdanis-choice-in-council-special-election/", secondaryUrl: "https://vote.nyc/election/special-election-city-council-district-3-election-day", urgency: "later", mobile: true, scope: "district", zips: ["10001", "10011", "10014", "10018", "10019", "10036", "10103", "10199"], sourceLabel: "NYC Board of Elections + reporting from THE CITY, Gothamist, City & State", requiresRegistration: false, attribution: "district_3", hasBallot: false, isResult: true, impact: { dollars: null, text: "Wilson succeeds Erik Bottcher (now in NY State Senate). His seat fills the District 3 vacancy that's been open since February 2026", areas: ["Housing", "LGBTQ+ rights", "Affordability"] }, calendar: null },
-  { id: "primary-registration", category: "registration", title: "Register for June Primary", subtitle: "Deadline: Saturday, June 13 · Primary June 23", description: "Primary narrows candidates for Governor, U.S. House, and state offices. You must be registered with a party to vote in that party's primary.", deadline: "2026-06-13T23:59:00", action: "Register online", actionType: "online_vote", actionUrl: "https://elections.ny.gov/", secondaryUrl: "https://www.nycvotes.org/how-to-vote/register-to-vote/", urgency: "later", mobile: true, scope: "statewide", zips: ["all"], sourceLabel: "NY State Board of Elections", requiresRegistration: true, isRegistrationGate: true, attribution: "statewide", hasBallot: false, impact: { dollars: null, text: "one missed primary can decide who your state senator and congressperson are for 2+ years", areas: ["Governor", "Congress", "State legislature"] }, calendar: { start: "2026-06-13T00:00:00", end: "2026-06-13T23:59:00" } },
-  { id: "cb3-full-board", category: "community_board", title: "Manhattan CB3 Full Board", subtitle: "Tuesday May 26 · 6:30pm · Location TBD", description: "East Village, Lower East Side, Chinatown. Public comment sign-up at 6:30pm. Last full board (April 28) covered cannabis applications and Essex Street liquor licenses.", deadline: "2026-05-26T18:30:00", action: "View calendar & agenda", actionType: "reference", actionUrl: "https://www.nyc.gov/site/manhattancb3/index.page", urgency: "later", mobile: false, scope: "district", zips: ["10002", "10003", "10009", "10013"], sourceLabel: "Manhattan Community Board 3", requiresRegistration: false, attribution: null, hasBallot: false, impact: { dollars: null, text: "CB3 reviews liquor licenses, sidewalk cafes, and street changes before they go to the city — your comment is on the record", areas: ["Liquor licenses", "Streets", "Land use"] }, calendar: { start: "2026-05-26T18:30:00", end: "2026-05-26T21:30:00" } },
-  { id: "cb7-committee", category: "community_board", title: "Manhattan CB7 Committee Meeting", subtitle: "Wednesday April 22 · 250 W 87th St", description: "Upper West Side. Hybrid meeting — Zoom option available. Agenda posted online.", deadline: "2026-04-22T19:00:00", action: "Register for Zoom", actionType: "virtual_meeting", actionUrl: "https://www.mcb7.org/", urgency: "soon", mobile: true, scope: "district", zips: ["10023", "10024", "10025", "10069"], sourceLabel: "Manhattan Community Board 7", requiresRegistration: false, attribution: null, hasBallot: false, impact: { dollars: null, text: "committee recommendations become the board's official position on development, transit, and local services", areas: ["Transit", "Development", "Parks"] }, calendar: { start: "2026-04-22T19:00:00", end: "2026-04-22T21:00:00" } },
-  { id: "ccrb-april", category: "oversight", title: "Civilian Complaint Review Board", subtitle: "Monthly meeting · Next: Wednesday May 13", description: "Public meeting of NYC's police oversight body. Attend online via Webex or in person at 100 Church St.", deadline: "2026-05-13T16:00:00", action: "Register to attend", actionType: "virtual_meeting", actionUrl: "https://www.nyc.gov/site/ccrb/about/news/board-meeting-schedule.page", urgency: "later", mobile: true, scope: "citywide", zips: ["all"], sourceLabel: "NYC CCRB", requiresRegistration: false, attribution: null, hasBallot: false, impact: { dollars: null, text: "CCRB decisions shape NYPD discipline policy citywide — public comment is part of the record", areas: ["Policing", "Oversight"] }, calendar: { start: "2026-05-13T16:00:00", end: "2026-05-13T18:00:00" } },
-  { id: "mn-borough-board", category: "community_board", title: "Manhattan Borough Board", subtitle: "Thursday May 21 · 8:30am · Zoom", description: "Borough-wide body — reviews land use, budget priorities, mediates between community boards. Watch live on Zoom or YouTube.", deadline: "2026-05-21T08:30:00", action: "Get Zoom link", actionType: "virtual_meeting", actionUrl: "https://www.manhattanbp.nyc.gov/communityboards/manhattan-borough-board/", urgency: "later", mobile: true, scope: "borough", zips: ["all"], sourceLabel: "Manhattan Borough President", requiresRegistration: false, attribution: null, hasBallot: false, impact: { dollars: null, text: "shapes borough-wide capital budget priorities that compete with the mayor's proposals", areas: ["Capital budget", "Land use"] }, calendar: { start: "2026-05-21T08:30:00", end: "2026-05-21T10:30:00" } },
-];
+// Transform a backend event (snake_case, nested action/source) into the
+// camelCase shape the rest of the UI consumes. Keeping the transform here
+// (close to the fetch) means downstream components don't need to change.
+function transformApiEvent(api) {
+  return {
+    id: api.id,
+    category: api.category,
+    title: api.title,
+    subtitle: api.subtitle ?? "",
+    description: api.description ?? "",
+    deadline: api.deadline,
+    action: api.action?.label ?? "",
+    actionType: api.action?.action_type ?? "reference",
+    actionUrl: api.action?.url ?? "#",
+    secondaryUrl: api.secondary_url ?? null,
+    urgency: api.urgency,
+    mobile: api.action?.is_mobile_friendly ?? true,
+    scope: api.scope,
+    zips: api.zips ?? [],
+    sourceLabel: api.source?.name ?? "",
+    requiresRegistration: api.requires_registration ?? false,
+    isRegistrationGate: api.is_registration_gate ?? false,
+    isResult: api.is_result ?? false,
+    attribution: api.attribution ?? null,
+    hasBallot: api.has_ballot ?? false,
+    impact: api.impact ?? null,
+    calendar: api.event_start && api.event_end
+      ? { start: api.event_start, end: api.event_end }
+      : null,
+  };
+}
 
 const categoryMeta = {
   participatory_budgeting: { label: "Budget Vote", icon: Vote },
@@ -208,11 +230,47 @@ export default function OnYourBlockDashboard() {
   const [actionStates, setActionStates] = useState(new Map());
   const [showOnboard, setShowOnboard] = useState(true);
   const [lang, setLang] = useState("en");
+  const [civicData, setCivicData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const t = translations[lang];
 
+  // Re-fetches whenever the active ZIP changes. The API matches by ZIP +
+  // community board + council district server-side, so the response *is* the
+  // event list for that ZIP — no client-side ZIP filter needed (CB-scoped
+  // events come back with empty `zips` arrays, so filtering by ZIP here would
+  // drop them). Dedupe/cancellation handled via the cancelled flag below.
+  useEffect(() => {
+    if (!zip || zip.length !== 5) return;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    let cancelled = false;
+    const work = baseUrl
+      ? fetch(`${baseUrl}/v1/events?zip=${zip}`).then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+      : Promise.reject(new Error("VITE_API_BASE_URL is not set"));
+    work
+      .then((response) => {
+        if (cancelled) return;
+        setCivicData((response.events ?? []).map(transformApiEvent));
+        setError(null);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setError(err.message || "Unknown error");
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [zip]);
+
   const events = useMemo(() => {
+    // ZIP filtering happens server-side (see fetch effect above). Only
+    // category and registration filters apply client-side.
     let filtered = [...civicData];
-    if (zip && zip.length === 5) filtered = filtered.filter((e) => e.zips.includes("all") || e.zips.includes(zip));
     if (registered) filtered = filtered.filter((e) => !e.isRegistrationGate);
     if (filter !== "all") filtered = filtered.filter((e) => e.category === filter);
     const urgencyOrder = { critical: 0, soon: 1, later: 2 };
@@ -220,12 +278,12 @@ export default function OnYourBlockDashboard() {
       if (urgencyOrder[a.urgency] !== urgencyOrder[b.urgency]) return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
       return new Date(a.deadline) - new Date(b.deadline);
     });
-  }, [zip, filter, registered]);
+  }, [filter, registered, civicData]);
 
   const criticalEvents = events.filter((e) => e.urgency === "critical" && actionStates.get(e.id)?.status !== "confirmed_attended");
   const confirmedRipples = useMemo(() => Array.from(actionStates.entries()).filter(([_, v]) => v.status === "confirmed_attended"), [actionStates]);
   const pendingConfirmations = useMemo(() => Array.from(actionStates.entries()).filter(([_, v]) => v.status === "pending_confirmation"), [actionStates]);
-  const completedEvents = useMemo(() => confirmedRipples.map(([id, v]) => ({ ...civicData.find((e) => e.id === id), completedAt: v.timestamp })).filter((e) => e.id).sort((a, b) => b.completedAt - a.completedAt), [confirmedRipples]);
+  const completedEvents = useMemo(() => confirmedRipples.map(([id, v]) => ({ ...civicData.find((e) => e.id === id), completedAt: v.timestamp })).filter((e) => e.id).sort((a, b) => b.completedAt - a.completedAt), [confirmedRipples, civicData]);
 
   const toggleNudge = (id) => setNudged((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const recordIntent = (event) => {
@@ -399,16 +457,26 @@ export default function OnYourBlockDashboard() {
             <div className="flex gap-2 mb-4 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide" role="tablist" aria-label="Filter by category">
               <Pill active={filter === "all"} onClick={() => setFilter("all")} label="All" count={events.length} />
               {Object.entries(categoryMeta).map(([key, meta]) => {
-                const count = civicData.filter((e) => e.category === key && (zip.length !== 5 || e.zips.includes("all") || e.zips.includes(zip))).length;
+                const count = civicData.filter((e) => e.category === key).length;
                 if (count === 0) return null;
                 return <Pill key={key} active={filter === key} onClick={() => setFilter(key)} label={meta.label} count={count} />;
               })}
             </div>
 
             <div className="space-y-3">
-              {events.length === 0 ? <EmptyState t={t} /> : events.map((event) => (
-                <EventCard key={event.id} event={event} zip={zip} nudged={nudged.has(event.id)} state={actionStates.get(event.id)} registered={registered} onNudge={() => toggleNudge(event.id)} onIntent={() => recordIntent(event)} onConfirm={(didAttend) => confirmAttendance(event.id, didAttend)} onImpact={() => setShowImpact(event.id)} t={t} />
-              ))}
+              {loading ? (
+                <div className="text-center text-sm text-stone-500 py-12">Loading…</div>
+              ) : error ? (
+                <div className="border border-rose-200 bg-rose-50 text-rose-800 rounded-2xl p-4 text-sm">
+                  Couldn't load events: {error}
+                </div>
+              ) : events.length === 0 ? (
+                <EmptyState t={t} />
+              ) : (
+                events.map((event) => (
+                  <EventCard key={event.id} event={event} zip={zip} nudged={nudged.has(event.id)} state={actionStates.get(event.id)} registered={registered} onNudge={() => toggleNudge(event.id)} onIntent={() => recordIntent(event)} onConfirm={(didAttend) => confirmAttendance(event.id, didAttend)} onImpact={() => setShowImpact(event.id)} t={t} />
+                ))
+              )}
             </div>
           </>
         )}
