@@ -51,15 +51,6 @@ const translations = {
   },
 };
 
-const councilMembers = {
-  1: { name: "Christopher Marte", district: "Lower Manhattan", email: "cmarte@council.nyc.gov", phone: "(212) 587-3159", bio: "https://council.nyc.gov/christopher-marte/", photo: "https://council.nyc.gov/district-1/wp-content/uploads/sites/58/2022/01/Marte-Headshot.jpg", zips: ["10002", "10013", "10038", "10280", "10282"] },
-  2: { name: "Harvey Epstein", district: "East Village / Gramercy", email: "district2@council.nyc.gov", phone: "(212) 677-1077", bio: "https://council.nyc.gov/district-2/", photo: null, zips: ["10003", "10009", "10010", "10016"] },
-  3: { name: null, district: "Chelsea / Hell's Kitchen / West Village", email: null, phone: null, bio: null, photo: null, zips: ["10001", "10011", "10014", "10018", "10019", "10036"], vacant: true },
-  5: { name: "Speaker Julie Menin", district: "Upper East Side", email: "district5@council.nyc.gov", phone: "(212) 860-1950", bio: "https://council.nyc.gov/julie-menin/", photo: null, zips: ["10021", "10022", "10028", "10065", "10075", "10128"] },
-  6: { name: "Gale A. Brewer", district: "Upper West Side", email: "district6@council.nyc.gov", phone: "(212) 873-0282", bio: "https://council.nyc.gov/gale-brewer/", photo: null, zips: ["10023", "10024", "10025", "10069"] },
-  7: { name: "Majority Leader Shaun Abreu", district: "Manhattan Valley / Hamilton Heights", email: "district7@council.nyc.gov", phone: "(212) 928-6814", bio: "https://council.nyc.gov/shaun-abreu/", photo: null, zips: ["10026", "10027", "10031", "10032"] },
-};
-
 const historicalContext = {
   // Manhattan
   "10011": [{ id: "chelsea-lighting-2023", year: 2023, title: "Lighting at Elliott-Chelsea & Fulton Houses", dollars: "$600,000", category: "Public safety", why: "In 2023, Chelsea neighbors voted to fund new park-area lighting at NYCHA's Elliott-Chelsea and Fulton Houses.", source: "NYC Council PB 2023", outcome: "Completed 2024" }],
@@ -113,6 +104,25 @@ const candidatesByEvent = {
     { name: "See full ballot", party: null, campaignUrl: "https://vote.nyc/", ballotpediaUrl: null, isFallback: true },
   ],
 };
+
+// Map an API council-member row (snake_case) to the shape the UI consumes.
+// Field renames mirror the events transform — see comment on transformApiEvent.
+// `pendingCertification` is a prototype UI state that the live data never sets;
+// keeping it `false` here so the existing JSX branches still resolve cleanly.
+function transformApiCouncilMember(api) {
+  return {
+    name: api.name,
+    vacant: api.vacant,
+    district: api.district_name,
+    districtNum: api.district,
+    email: api.email,
+    phone: api.phone,
+    bio: api.bio_url,
+    photo: api.photo_url,
+    zips: api.zips,
+    pendingCertification: false,
+  };
+}
 
 // Transform a backend event (snake_case, nested action/source) into the
 // camelCase shape the rest of the UI consumes. Keeping the transform here
@@ -182,14 +192,6 @@ function toGCalLink(event) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-function findCouncilMemberByZip(zip) {
-  if (!zip || zip.length !== 5) return null;
-  for (const [districtNum, cm] of Object.entries(councilMembers)) {
-    if (cm.zips.includes(zip)) return { ...cm, districtNum };
-  }
-  return null;
-}
-
 function historyForZip(zip) {
   const local = historicalContext[zip] || [];
   const citywide = historicalContext.all || [];
@@ -220,16 +222,15 @@ function CouncilPhoto({ member, size = "sm" }) {
   );
 }
 
-function CouncilMemberBadge({ zip, attribution, t }) {
+function CouncilMemberBadge({ councilMember, attribution }) {
   if (attribution === "statewide") return <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium"><User className="w-3 h-3" /><span>Statewide action</span></div>;
   if (attribution === "multi_council") return <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium"><Users className="w-3 h-3" /><span>22 Council Members participating</span></div>;
   if (attribution === "district_3") return <div className="flex items-center gap-1.5 text-[11px] text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded-full"><AlertCircle className="w-3 h-3" /><span>Seat vacant — you choose</span></div>;
-  const cm = findCouncilMemberByZip(zip);
-  if (!cm || cm.vacant) return null;
+  if (!councilMember || councilMember.vacant) return null;
   return (
-    <a href={cm.bio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] text-stone-600 font-medium hover:text-stone-900 transition focus:outline-none focus:ring-2 focus:ring-stone-400 rounded">
+    <a href={councilMember.bio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] text-stone-600 font-medium hover:text-stone-900 transition focus:outline-none focus:ring-2 focus:ring-stone-400 rounded">
       <User className="w-3 h-3" />
-      <span>Rep: {cm.name}</span>
+      <span>Rep: {councilMember.name}</span>
       <ExternalLink className="w-2.5 h-2.5 opacity-60" />
     </a>
   );
@@ -254,6 +255,7 @@ export default function OnYourBlockDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [councilMember, setCouncilMember] = useState(null);
   const t = translations[lang];
   const lastUpdatedLabel = formatLastUpdated(lastUpdated);
 
@@ -287,6 +289,37 @@ export default function OnYourBlockDashboard() {
         if (cancelled) return;
         setError(err.message || "Unknown error");
         setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [zip]);
+
+  // Fetches the council member(s) covering the active ZIP. Independent from
+  // the events fetch — a 404 here (ZIP we don't have a district mapping for)
+  // shouldn't error-banner the events feed. Multiple districts are rare; we
+  // take the first member.
+  useEffect(() => {
+    if (!zip || zip.length !== 5) return;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    if (!baseUrl) return;
+    let cancelled = false;
+    fetch(`${baseUrl}/v1/council-members/by-zip/${zip}`)
+      .then((res) => {
+        if (res.status === 404) return null;
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const first = data?.members?.[0];
+        setCouncilMember(first ? transformApiCouncilMember(first) : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Council member is auxiliary info — silently drop on transient
+        // failures rather than blocking the page.
+        setCouncilMember(null);
       });
     return () => {
       cancelled = true;
@@ -327,7 +360,7 @@ export default function OnYourBlockDashboard() {
   const applyZip = () => { if (zipInput.length === 5) setZip(zipInput); };
 
   const activeEvent = civicData.find((e) => e.id === showImpact);
-  const activeCouncilMember = findCouncilMemberByZip(zip);
+  const activeCouncilMember = councilMember;
   const localHistory = historyForZip(zip);
 
   // Render a full trust document page if one is open
@@ -500,7 +533,7 @@ export default function OnYourBlockDashboard() {
                 <EmptyState t={t} />
               ) : (
                 events.map((event) => (
-                  <EventCard key={event.id} event={event} zip={zip} nudged={nudged.has(event.id)} state={actionStates.get(event.id)} registered={registered} onNudge={() => toggleNudge(event.id)} onIntent={() => recordIntent(event)} onConfirm={(didAttend) => confirmAttendance(event.id, didAttend)} onImpact={() => setShowImpact(event.id)} t={t} />
+                  <EventCard key={event.id} event={event} zip={zip} councilMember={councilMember} nudged={nudged.has(event.id)} state={actionStates.get(event.id)} registered={registered} onNudge={() => toggleNudge(event.id)} onIntent={() => recordIntent(event)} onConfirm={(didAttend) => confirmAttendance(event.id, didAttend)} onImpact={() => setShowImpact(event.id)} t={t} />
                 ))
               )}
             </div>
@@ -553,7 +586,7 @@ export default function OnYourBlockDashboard() {
         </div>
       </div>
 
-      {activeEvent && <ImpactSheet event={activeEvent} zip={zip} registered={registered} onClose={() => setShowImpact(null)} onIntent={() => recordIntent(activeEvent)} />}
+      {activeEvent && <ImpactSheet event={activeEvent} zip={zip} councilMember={councilMember} registered={registered} onClose={() => setShowImpact(null)} onIntent={() => recordIntent(activeEvent)} />}
       {showCouncilMember && activeCouncilMember && !activeCouncilMember.vacant && <CouncilMemberSheet member={activeCouncilMember} onClose={() => setShowCouncilMember(false)} />}
       {showWhyWeAsk && <WhyWeAskSheet onClose={() => setShowWhyWeAsk(false)} onOpenPrivacy={() => { setShowWhyWeAsk(false); setTrustDoc("privacy"); }} />}
       {showReportMissing && <ReportMissingSheet onClose={() => setShowReportMissing(false)} />}
@@ -580,7 +613,7 @@ function Pill({ active, onClick, label, count }) {
   );
 }
 
-function EventCard({ event, zip, nudged, state, registered, onNudge, onIntent, onConfirm, onImpact, t }) {
+function EventCard({ event, zip, councilMember, nudged, state, registered, onNudge, onIntent, onConfirm, onImpact, t }) {
   const [showBallot, setShowBallot] = useState(false);
   const [showCandidates, setShowCandidates] = useState(false);
   const urgency = urgencyMeta[event.urgency];
@@ -615,7 +648,7 @@ function EventCard({ event, zip, nudged, state, registered, onNudge, onIntent, o
         <div className="text-sm text-stone-600 mb-2">{event.subtitle}</div>
         <p className="text-sm text-stone-700 leading-relaxed mb-3">{event.description}</p>
 
-        <div className="mb-3"><CouncilMemberBadge zip={zip} attribution={event.attribution} t={t} /></div>
+        <div className="mb-3"><CouncilMemberBadge councilMember={councilMember} attribution={event.attribution} /></div>
 
         <button onClick={onImpact} className="w-full text-left bg-gradient-to-r from-stone-50 to-stone-100/50 hover:from-stone-100 hover:to-stone-100 border border-stone-200/50 rounded-xl px-3 py-2.5 mb-3 transition group/impact focus:outline-none focus:ring-2 focus:ring-stone-400">
           <div className="flex items-start gap-2">
@@ -914,7 +947,7 @@ function LegacyCard({ item, faded = false }) {
   );
 }
 
-function ImpactSheet({ event, zip, registered, onClose, onIntent }) {
+function ImpactSheet({ event, zip, councilMember, registered, onClose, onIntent }) {
   const actionLabel = event.requiresRegistration && registered && event.action.toLowerCase().includes("register") ? "Vote now" : event.action;
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="impact-sheet-title">
@@ -927,7 +960,7 @@ function ImpactSheet({ event, zip, registered, onClose, onIntent }) {
         <div className="px-5 py-5">
           <h2 id="impact-sheet-title" className="font-bold text-2xl tracking-tight leading-tight mb-1">{event.title}</h2>
           <div className="text-sm text-stone-500 mb-5">{event.subtitle}</div>
-          <div className="mb-5"><CouncilMemberBadge zip={zip} attribution={event.attribution} /></div>
+          <div className="mb-5"><CouncilMemberBadge councilMember={councilMember} attribution={event.attribution} /></div>
           {event.impact.dollars && (
             <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 mb-4">
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-amber-800 mb-2"><DollarSign className="w-3.5 h-3.5" aria-hidden="true" /> Dollars on the line</div>
