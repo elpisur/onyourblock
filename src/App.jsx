@@ -1,9 +1,29 @@
 import { useState, useMemo, useEffect } from "react";
 import { MapPin, Clock, ExternalLink, Calendar, Vote, Users, AlertCircle, Bell, Share2, ChevronRight, Info, Check, CalendarDays, List, DollarSign, TrendingUp, Sparkles, X, BellRing, ArrowUpRight, Mail, Phone, User, ThumbsUp, ThumbsDown, History, MapPinned, Globe, Flag, ShieldCheck, FileText, Heart, ArrowLeft, CheckCircle2, Building2, Accessibility } from "lucide-react";
 
-const TODAY = new Date(2026, 4, 3); // May 3, 2026 in local time (month is 0-indexed)
+// Evaluated at module load. Module reloads on browser refresh, which is
+// effectively how often a user re-opens the page; drift across midnight in
+// a long-lived tab is acceptable for the prototype.
+const TODAY = new Date();
 const APP_VERSION = "0.4.3-prototype";
-const DATA_LAST_UPDATED = "May 3, 2026";
+
+// Format a Date as a short, human-readable "last updated" label.
+// Returns "—" when no successful fetch has happened yet.
+function formatLastUpdated(date) {
+  if (!date) return "—";
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = date.toDateString() === yesterday.toDateString();
+  // Including seconds so a re-fetch within the same minute still produces a
+  // visibly different label — useful for verifying the timestamp updates.
+  const time = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", second: "2-digit" });
+  if (sameDay) return `today at ${time}`;
+  if (isYesterday) return `yesterday at ${time}`;
+  const day = date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${day} at ${time}`;
+}
 
 // Translations — Spanish included as demonstration of i18n approach
 const translations = {
@@ -233,7 +253,9 @@ export default function OnYourBlockDashboard() {
   const [civicData, setCivicData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const t = translations[lang];
+  const lastUpdatedLabel = formatLastUpdated(lastUpdated);
 
   // Re-fetches whenever the active ZIP changes. The API matches by ZIP +
   // community board + council district server-side, so the response *is* the
@@ -255,6 +277,10 @@ export default function OnYourBlockDashboard() {
         if (cancelled) return;
         setCivicData((response.events ?? []).map(transformApiEvent));
         setError(null);
+        // Only stamp on success — failed fetches keep showing the last
+        // good timestamp so users see when the data they're looking at
+        // was actually current.
+        setLastUpdated(new Date());
         setLoading(false);
       })
       .catch((err) => {
@@ -305,7 +331,7 @@ export default function OnYourBlockDashboard() {
   const localHistory = historyForZip(zip);
 
   // Render a full trust document page if one is open
-  if (trustDoc) return <TrustDocumentPage doc={trustDoc} onClose={() => setTrustDoc(null)} t={t} />;
+  if (trustDoc) return <TrustDocumentPage doc={trustDoc} onClose={() => setTrustDoc(null)} t={t} lastUpdatedLabel={lastUpdatedLabel} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-stone-50 to-stone-100 text-stone-900 motion-safe:transition-colors" style={{ fontFamily: "ui-sans-serif, system-ui, -apple-system, sans-serif" }}>
@@ -314,7 +340,7 @@ export default function OnYourBlockDashboard() {
           <div className="max-w-5xl mx-auto px-4 py-2.5 flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" aria-hidden="true" />
-              <span className="opacity-90">Prototype · Real NYC data, sourced {DATA_LAST_UPDATED}</span>
+              <span className="opacity-90">Prototype · Real NYC data, updated {lastUpdatedLabel}</span>
             </div>
             <button onClick={() => setShowOnboard(false)} aria-label="Dismiss banner" className="opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-amber-400 rounded p-0.5"><X className="w-3.5 h-3.5" /></button>
           </div>
@@ -501,7 +527,7 @@ export default function OnYourBlockDashboard() {
           <div className="flex items-center gap-2">
             <span>v{APP_VERSION}</span>
             <span aria-hidden="true">·</span>
-            <span>Data: {DATA_LAST_UPDATED}</span>
+            <span>Updated {lastUpdatedLabel}</span>
           </div>
         </div>
       </footer>
@@ -719,7 +745,7 @@ function CalendarView({ events, onEventClick }) {
         {days.map((day, i) => {
           const key = formatKey(day);
           const dayEvents = eventsByDate[key] || [];
-          const isToday = key === "2026-05-03";
+          const isToday = key === formatKey(TODAY);
           const isPast = day < TODAY && !isToday;
           const month = day.getMonth();
           return (
@@ -1057,7 +1083,7 @@ function ReportMissingSheet({ onClose }) {
   );
 }
 
-function TrustDocumentPage({ doc, onClose, t }) {
+function TrustDocumentPage({ doc, onClose, t, lastUpdatedLabel }) {
   const content = {
     about: <AboutContent />,
     privacy: <PrivacyContent />,
@@ -1073,7 +1099,7 @@ function TrustDocumentPage({ doc, onClose, t }) {
           <button onClick={onClose} aria-label="Back" className="w-9 h-9 rounded-full hover:bg-stone-100 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-stone-400"><ArrowLeft className="w-4 h-4 text-stone-700" /></button>
           <div>
             <div className="font-bold text-base tracking-tight">{title}</div>
-            <div className="text-[11px] text-stone-500">On Your Block · Updated {DATA_LAST_UPDATED}</div>
+            <div className="text-[11px] text-stone-500">On Your Block · Updated {lastUpdatedLabel}</div>
           </div>
         </div>
       </header>
@@ -1081,7 +1107,7 @@ function TrustDocumentPage({ doc, onClose, t }) {
         {content}
         <div className="mt-12 pt-6 border-t border-stone-200 text-xs text-stone-500">
           <div>Questions? <a href="mailto:hello@onyourblock.nyc" className="underline hover:text-stone-800">hello@onyourblock.nyc</a> <span className="text-stone-400">(placeholder — not yet active)</span></div>
-          <div className="mt-2">Version {APP_VERSION} · Data last updated {DATA_LAST_UPDATED}</div>
+          <div className="mt-2">Version {APP_VERSION} · Data last updated {lastUpdatedLabel}</div>
         </div>
       </main>
     </div>
