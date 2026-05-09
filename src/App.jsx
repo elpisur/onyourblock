@@ -51,23 +51,6 @@ const translations = {
   },
 };
 
-const historicalContext = {
-  // Manhattan
-  "10011": [{ id: "chelsea-lighting-2023", year: 2023, title: "Lighting at Elliott-Chelsea & Fulton Houses", dollars: "$600,000", category: "Public safety", why: "In 2023, Chelsea neighbors voted to fund new park-area lighting at NYCHA's Elliott-Chelsea and Fulton Houses.", source: "NYC Council PB 2023", outcome: "Completed 2024" }],
-  "10002": [{ id: "les-streetsafety-2024", year: 2023, title: "Sidewalk extensions near PS 51 and PS 159", dollars: "$100,000", category: "Safe streets", why: "PB voters funded curb extensions to protect kids walking to school. Those sidewalks exist because your neighbors showed up.", source: "NYC Council PB 2023", outcome: "Construction 2024–2025" }],
-  "10024": [{ id: "uws-library-2024", year: 2024, title: "St. Agnes & Riverside library computer upgrades", dollars: "$250,000", category: "Libraries", why: "The public computers at your local library branches were replaced because District 6 voted for it in PB. Job searches, forms, applications — all on those machines.", source: "NYC Council PB District 6", outcome: "Installed 2025" }],
-  "10027": [{ id: "d7-schools-2025", year: 2025, title: "School bathroom upgrades, District 7", dollars: "$400,000", category: "Schools", why: "Majority Leader Abreu's district funded school bathroom renovations and library improvements based on what families asked for at neighborhood assemblies.", source: "NYC Council PB FY2026", outcome: "In progress 2025–2026" }],
-  // Brooklyn
-  "11211": [{ id: "wburg-foodpantry-2021", year: 2021, title: "Permanent Food Pantry at Taylor-Wythe Houses", dollars: "$10,000", category: "Food security", why: "In 2021, 1,142 District 33 voters funded a permanent food pantry at the Taylor-Wythe public housing complex, operated by community groups Los Sures and El Puente. It's there because the neighborhood voted for it.", source: "NYC Council PB 2021", outcome: "Operational since 2021" }],
-  "11215": [{ id: "psd39-circlekeepers-2025", year: 2025, title: "Youth Voice For Justice — Conflict Resolution Training", dollars: "$1,500,000 across district", category: "Youth programs", why: "In 2025, District 39 voters funded a youth-led restorative justice training program at Brooklyn High School with The Circle Keepers. Council Member Hanif's district saw record-breaking PB turnout that year.", source: "NYC Council PB FY2026 District 39", outcome: "Launched 2025" }],
-  "11217": [{ id: "psd39-circlekeepers-2025-217", year: 2025, title: "District 39 PB — Multiple community-funded projects", dollars: "$1,500,000 total", category: "Mixed", why: "In 2025, District 39 (covering parts of Park Slope and Boerum Hill) had record PB turnout. Voters approved $1.5M in projects across schools, parks, and community programs.", source: "NYC Council PB FY2026 District 39", outcome: "Funded for FY2026" }],
-  "11218": [{ id: "psd39-circlekeepers-2025-218", year: 2025, title: "Kensington-Windsor Terrace PB Projects", dollars: "Part of $1.5M district allocation", category: "Schools & parks", why: "Kensington and Windsor Terrace residents in District 39 voted in 2025 to fund local school improvements and park upgrades.", source: "NYC Council PB FY2026 District 39", outcome: "Funded for FY2026" }],
-  "11206": [{ id: "d34-trees-2017", year: 2017, title: "250 trees for Ridgewood, Bushwick & Williamsburg", dollars: "$450,000", category: "Green space", why: "In an earlier PB cycle, District 34 voters chose to plant 250 trees across Ridgewood, Bushwick, and Williamsburg — green canopy that's still cooling these blocks today.", source: "NYC Council PB Cycle 7", outcome: "Trees planted 2018–2019" }],
-  "all": [
-    { id: "citywide-bronx-garden-2025", year: 2025, title: "Harding Park Community Garden upgrades", dollars: "$800,000", category: "Green space", why: "In the Bronx, 8,200 residents voted to finally give the Harding Park community garden long-overdue upgrades. That garden is tended today because of a PB ballot.", source: "NYC Council PB FY2026", outcome: "Funded, implementation 2026" },
-    { id: "citywide-bustime-2023", year: 2023, title: "Real-time MTA BusTime signs, Staten Island", dollars: "$200,000", category: "Transit", why: "If you've ever checked a bus countdown sign along the S48, S53, S44, S40, or S46 routes, PB voters paid for it — specifically for riders without smartphones.", source: "NYC Council PB 2023", outcome: "Deployed 2024" },
-  ],
-};
 
 // Real ballot items — sampled from actual 2026 PB ballots by district
 const ballotPreviews = {
@@ -104,6 +87,38 @@ const candidatesByEvent = {
     { name: "See full ballot", party: null, campaignUrl: "https://vote.nyc/", ballotpediaUrl: null, isFallback: true },
   ],
 };
+
+// Format an API outcome_status enum into the editorial label LegacyCard expects
+// ("Funded for FY2026", "Completed 2024"). Pulls year from outcome_date or
+// fiscal_year — never invents one.
+function formatHistoryOutcome(status, outcomeDate, fiscalYear) {
+  if (!status) return null;
+  if (status === "funded" && fiscalYear) return `Funded for FY${fiscalYear}`;
+  if (status === "in_progress") {
+    if (outcomeDate) return `In progress (${outcomeDate.split("-")[0]})`;
+    return "In progress";
+  }
+  if (status === "completed") {
+    if (outcomeDate) return `Completed ${outcomeDate.split("-")[0]}`;
+    return "Completed";
+  }
+  const s = status.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Map an API historical-project row to the shape LegacyCard consumes.
+function transformApiHistoryProject(api) {
+  return {
+    id: api.id,
+    year: api.announced_year,
+    title: api.title,
+    dollars: api.dollars,
+    category: api.category,
+    why: api.narrative,
+    source: api.source_cycle,
+    outcome: formatHistoryOutcome(api.outcome_status, api.outcome_date, api.fiscal_year),
+  };
+}
 
 // Map an API council-member row (snake_case) to the shape the UI consumes.
 // Field renames mirror the events transform — see comment on transformApiEvent.
@@ -192,12 +207,6 @@ function toGCalLink(event) {
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
-function historyForZip(zip) {
-  const local = historicalContext[zip] || [];
-  const citywide = historicalContext.all || [];
-  return { local, citywide };
-}
-
 function RippleIcon({ className = "w-4 h-4", filled = false }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
@@ -256,6 +265,7 @@ export default function OnYourBlockDashboard() {
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [councilMember, setCouncilMember] = useState(null);
+  const [historyState, setHistoryState] = useState({ projects: [], loading: true });
   const t = translations[lang];
   const lastUpdatedLabel = formatLastUpdated(lastUpdated);
 
@@ -326,6 +336,33 @@ export default function OnYourBlockDashboard() {
     };
   }, [zip]);
 
+  // Fetches PB historical projects for the active ZIP. Independent from
+  // the events and council-members fetches — failures here just leave the
+  // Legacy view empty rather than blocking the page.
+  useEffect(() => {
+    if (!zip || zip.length !== 5) return;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    if (!baseUrl) return;
+    let cancelled = false;
+    fetch(`${baseUrl}/v1/history?zip=${zip}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        const projects = (data?.projects ?? []).map(transformApiHistoryProject);
+        setHistoryState({ projects, loading: false });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setHistoryState({ projects: [], loading: false });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [zip]);
+
   const events = useMemo(() => {
     // ZIP filtering happens server-side (see fetch effect above). Only
     // category and registration filters apply client-side.
@@ -361,7 +398,7 @@ export default function OnYourBlockDashboard() {
 
   const activeEvent = civicData.find((e) => e.id === showImpact);
   const activeCouncilMember = councilMember;
-  const localHistory = historyForZip(zip);
+  const localHistory = historyState;
 
   // Render a full trust document page if one is open
   if (trustDoc) return <TrustDocumentPage doc={trustDoc} onClose={() => setTrustDoc(null)} t={t} lastUpdatedLabel={lastUpdatedLabel} />;
@@ -866,16 +903,18 @@ function ImpactHistoryView({ completedEvents, onEventClick }) {
 }
 
 function LegacyView({ history, zip }) {
-  const { local, citywide } = history;
-  const hasLocal = local.length > 0;
-  const hasCitywide = citywide.length > 0;
+  const { projects, loading } = history;
 
-  if (!hasLocal && !hasCitywide) {
+  if (loading) {
+    return <div className="text-center text-sm text-stone-500 py-12">Loading…</div>;
+  }
+
+  if (projects.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center">
         <div className="w-14 h-14 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-3 text-stone-400"><History className="w-6 h-6" /></div>
         <div className="font-semibold text-stone-800 mb-1">No neighborhood history yet</div>
-        <div className="text-sm text-stone-500 max-w-sm mx-auto leading-relaxed">Try a different ZIP — we have records of PB-funded projects for several NYC districts.</div>
+        <div className="text-sm text-stone-500 max-w-sm mx-auto leading-relaxed">No PB-funded projects on file for this ZIP. Try a different one — coverage varies by council district.</div>
       </div>
     );
   }
@@ -888,30 +927,13 @@ function LegacyView({ history, zip }) {
         <p className="text-sm text-stone-600 leading-relaxed">These are real projects funded by Participatory Budgeting votes. The park bench, the library computer, the safer crosswalk — someone voted for it.</p>
       </div>
 
-      {hasLocal && (
-        <>
-          <div className="flex items-center gap-2 pt-2 px-1">
-            <MapPin className="w-3.5 h-3.5 text-stone-600" aria-hidden="true" />
-            <div className="text-xs font-semibold uppercase tracking-wider text-stone-700">In your area</div>
-          </div>
-          <div className="space-y-3">
-            {local.map((item) => <LegacyCard key={item.id} item={item} />)}
-          </div>
-        </>
-      )}
-
-      {hasCitywide && (
-        <>
-          <div className="flex items-center gap-2 pt-2 px-1">
-            <Users className="w-3.5 h-3.5 text-stone-500" aria-hidden="true" />
-            <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">Elsewhere in NYC</div>
-          </div>
-          <p className="text-[11px] text-stone-500 px-1 -mt-2 leading-relaxed">PB happens citywide. These projects aren't in your ZIP — they're examples of what voters across NYC have funded. We're still building out neighborhood-level history for every district.</p>
-          <div className="space-y-3">
-            {citywide.map((item) => <LegacyCard key={item.id} item={item} faded />)}
-          </div>
-        </>
-      )}
+      <div className="flex items-center gap-2 pt-2 px-1">
+        <MapPin className="w-3.5 h-3.5 text-stone-600" aria-hidden="true" />
+        <div className="text-xs font-semibold uppercase tracking-wider text-stone-700">In your area</div>
+      </div>
+      <div className="space-y-3">
+        {projects.map((item) => <LegacyCard key={item.id} item={item} />)}
+      </div>
 
       <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5 text-center">
         <div className="text-sm font-semibold text-amber-900 mb-1">Your vote becomes next year's legacy.</div>
