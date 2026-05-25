@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code local files — private notes, not for the public repo
+CLAUDE.md
+.claude/
