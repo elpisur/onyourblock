@@ -203,7 +203,14 @@ const categoryMeta = {
   registration: { label: "Registration", icon: Users },
   community_board: { label: "Community Board", icon: Users },
   oversight: { label: "Oversight", icon: AlertCircle },
+  // Generic public-meeting category — non-NYC bodies (e.g. NJ borough councils)
+  // where "Community Board" would be NYC-specific mislabeling.
+  town_hall: { label: "Public Meeting", icon: Users },
 };
+
+// Fallback for categories the API may add before this map learns them —
+// renders a neutral chip instead of crashing on `cat.icon`.
+const fallbackCategoryMeta = { label: "Civic Event", icon: AlertCircle };
 
 const urgencyMeta = {
   critical: { dotColor: "bg-rose-500", textColor: "text-rose-600", bgColor: "bg-rose-50", borderColor: "border-rose-200" },
@@ -526,7 +533,10 @@ export default function OnYourBlockDashboard() {
                 <div className="flex items-center gap-2 min-w-0">
                   <CouncilPhoto member={activeCouncilMember} />
                   <div className="min-w-0">
-                    <div className="text-stone-500 text-[10px] uppercase tracking-wider font-semibold">{activeCouncilMember.office ? `Your ${activeCouncilMember.office}` : t.yourCouncilMember}</div>
+                    {/* Office titles come from the data untranslated, so non-EN
+                        locales use the generic translated label ("Tu Representante")
+                        rather than mixing languages ("Tu Mayor"). */}
+                    <div className="text-stone-500 text-[10px] uppercase tracking-wider font-semibold">{lang === "en" && activeCouncilMember.office ? `Your ${activeCouncilMember.office}` : t.yourCouncilMember}</div>
                     <div className="font-semibold text-stone-900 truncate">{activeCouncilMember.name}</div>
                   </div>
                 </div>
@@ -694,7 +704,7 @@ function EventCard({ event, zip, councilMember, nudged, state, registered, onNud
   const [showBallot, setShowBallot] = useState(false);
   const [showCandidates, setShowCandidates] = useState(false);
   const urgency = urgencyMeta[event.urgency];
-  const cat = categoryMeta[event.category];
+  const cat = categoryMeta[event.category] ?? fallbackCategoryMeta;
   const Icon = cat.icon;
   const status = state?.status;
   const isConfirmed = status === "confirmed_attended";
@@ -734,7 +744,10 @@ function EventCard({ event, zip, councilMember, nudged, state, registered, onNud
               <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 mb-0.5">{t.whyItMatters}</div>
               <div className="text-xs text-stone-700 leading-relaxed">
                 {event.impact.dollars && <span className="font-bold text-stone-900">{event.impact.dollars} · </span>}
-                This {event.impact.text}.
+                {/* impact.text is a complete sentence from the API — the old
+                    `This {text}.` template was for fragment-style prototype copy
+                    and produced "This Wilson succeeds…" / double periods. */}
+                {event.impact.text}
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-stone-400 mt-1 motion-safe:group-hover/impact:translate-x-0.5 motion-safe:transition" aria-hidden="true" />
@@ -837,15 +850,25 @@ function EventCard({ event, zip, councilMember, nudged, state, registered, onNud
 }
 
 function CalendarView({ events, onEventClick }) {
-  const start = new Date(2026, 3, 26); // April 26, 2026 (Sunday in week before May 3)
+  // Rolling 6-week window anchored on today (was hardcoded to April 26, 2026 —
+  // a prototype leftover that left the calendar permanently two months stale).
+  // Starts on the Sunday of the current week so today is always in week one.
+  const start = new Date(TODAY);
+  start.setDate(start.getDate() - start.getDay());
+  start.setHours(0, 0, 0, 0);
   const days = Array.from({ length: 42 }, (_, i) => { const d = new Date(start); d.setDate(d.getDate() + i); return d; });
   const formatKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const eventsByDate = useMemo(() => { const map = {}; events.forEach((e) => { const key = e.deadline.split("T")[0]; if (!map[key]) map[key] = []; map[key].push(e); }); return map; }, [events]);
+  const monthLabel = (d) => d.toLocaleDateString("en-US", { month: "long" });
+  const first = days[0]; const last = days[days.length - 1];
+  const headerLabel = first.getMonth() === last.getMonth()
+    ? `${monthLabel(first)} ${last.getFullYear()}`
+    : `${monthLabel(first)} – ${monthLabel(last)} ${last.getFullYear()}`;
 
   return (
     <div className="bg-white rounded-2xl border border-stone-200 overflow-hidden">
       <div className="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
-        <h2 className="font-bold text-base tracking-tight">April – May 2026</h2>
+        <h2 className="font-bold text-base tracking-tight">{headerLabel}</h2>
         <div className="text-xs text-stone-500">{events.length} items</div>
       </div>
       <div className="grid grid-cols-7 text-[10px] font-semibold uppercase tracking-wider text-stone-400 px-2 pt-2" aria-hidden="true">
@@ -860,7 +883,7 @@ function CalendarView({ events, onEventClick }) {
           const month = day.getMonth();
           return (
             <div key={i} role="gridcell" className={`aspect-square min-h-[60px] rounded-lg p-1.5 text-left flex flex-col ${isToday ? "bg-amber-50 ring-2 ring-amber-400" : isPast ? "bg-stone-50 opacity-40" : "bg-stone-50/50 hover:bg-stone-100/50"} transition`}>
-              <div className={`text-[11px] font-semibold mb-0.5 ${isToday ? "text-amber-900" : month === 3 ? "text-stone-700" : "text-stone-400"}`}>{day.getDate()}</div>
+              <div className={`text-[11px] font-semibold mb-0.5 ${isToday ? "text-amber-900" : month === TODAY.getMonth() ? "text-stone-700" : "text-stone-400"}`}>{day.getDate()}</div>
               <div className="flex-1 space-y-0.5 overflow-hidden">
                 {dayEvents.slice(0, 2).map((e) => {
                   const urgency = urgencyMeta[e.urgency];
@@ -918,7 +941,7 @@ function ImpactHistoryView({ completedEvents, onEventClick }) {
         <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 mb-2 px-1">History</div>
         <div className="space-y-2">
           {completedEvents.map((event) => {
-            const cat = categoryMeta[event.category];
+            const cat = categoryMeta[event.category] ?? fallbackCategoryMeta;
             const Icon = cat.icon;
             const completedDate = new Date(event.completedAt);
             return (
@@ -1036,7 +1059,7 @@ function ImpactSheet({ event, zip, councilMember, registered, onClose, onIntent 
             </div>
             <div className="bg-stone-50 border border-stone-200 rounded-xl p-4">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500 mb-1.5">Why this matters</div>
-              <p className="text-sm text-stone-800 leading-relaxed">This {event.impact.text}.</p>
+              <p className="text-sm text-stone-800 leading-relaxed">{event.impact.text}</p>
             </div>
             <div className="flex items-start gap-2 text-xs text-stone-500"><Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" aria-hidden="true" /><span>Source: {event.sourceLabel}</span></div>
           </div>
