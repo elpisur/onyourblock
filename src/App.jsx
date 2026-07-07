@@ -33,7 +33,7 @@ const translations = {
     closesSoon: "Closes soon", thisWeek: "This week", upcoming: "Upcoming",
     whyItMatters: "Why it matters", voteNow: "Vote now", registered: "Registered",
     imRegistered: "I'm registered", whyWeAsk: "Why we ask",
-    yourCouncilMember: "Your Council Member", acted: "Acted", rippleMade: "Ripple made",
+    yourCouncilMember: "Your Representative", acted: "Acted", rippleMade: "Ripple made",
     checkInLater: "Check in later", missed: "Missed", didYouAttend: "Did you attend?",
     about: "About", privacy: "Privacy", terms: "Terms", reportMissing: "Report missing event",
     pageNotFound: "Nothing here yet",
@@ -44,7 +44,7 @@ const translations = {
     closesSoon: "Cierra pronto", thisWeek: "Esta semana", upcoming: "Próximo",
     whyItMatters: "Por qué importa", voteNow: "Votar ahora", registered: "Registrado",
     imRegistered: "Estoy registrado", whyWeAsk: "Por qué preguntamos",
-    yourCouncilMember: "Tu Miembro del Consejo", acted: "Actuó", rippleMade: "Onda creada",
+    yourCouncilMember: "Tu Representante", acted: "Actuó", rippleMade: "Onda creada",
     checkInLater: "Confirmar después", missed: "Perdido", didYouAttend: "¿Asististe?",
     about: "Acerca de", privacy: "Privacidad", terms: "Términos", reportMissing: "Reportar evento faltante",
     pageNotFound: "Nada por aquí todavía",
@@ -120,20 +120,46 @@ function transformApiHistoryProject(api) {
   };
 }
 
-// Map an API council-member row (snake_case) to the shape the UI consumes.
-// Field renames mirror the events transform — see comment on transformApiEvent.
-// `pendingCertification` is a prototype UI state that the live data never sets;
-// keeping it `false` here so the existing JSX branches still resolve cleanly.
+// Feature flag: the "pending certification" civic-results banner (a special
+// election winner announced but not yet certified). Intentionally kept in the
+// tree as future infrastructure but disabled — see the banner's TODO. Live data
+// never sets pendingCertification today, so this is off in practice regardless.
+const FEATURE_PENDING_CERTIFICATION = false;
+
+// Hostname of a URL for display ("council.nyc.gov", "www.bernardsville.gov"),
+// so link labels/footnotes read from the rep's own source instead of a
+// hardcoded NYC domain. Returns "" if the URL is missing/unparseable.
+function hostnameOf(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
+}
+
+// Map an API representative row (snake_case) to the shape the UI consumes.
+// Jurisdiction-agnostic: office/jurisdiction labels come from the data, never
+// hardcoded, so a NJ ZIP renders "Mayor"/"Bernardsville Borough" rather than
+// NYC "Council Member"/"Council District". `district`/`districtNum` are kept for
+// back-compat (and the disabled pendingCertification branch). Function/variable
+// names still say "council" pending a separate cosmetic rename pass.
 function transformApiCouncilMember(api) {
   return {
     name: api.name,
     vacant: api.vacant,
-    district: api.district_name,
-    districtNum: api.district,
+    office: api.office ?? "Representative",
+    jurisdictionLabel: api.jurisdiction_label ?? api.district_name ?? "",
+    jurisdictionArea: api.jurisdiction_area ?? null,
+    level: api.level ?? null,
+    usState: api.us_state ?? null,
+    // Legacy geographic gloss (old district_name) — now jurisdiction_area.
+    district: api.jurisdiction_area ?? api.district_name,
+    districtNum: api.district_num ?? api.district,
     email: api.email,
     phone: api.phone,
     bio: api.bio_url,
     photo: api.photo_url,
+    sourceUrl: api.source_url ?? api.bio_url,
     zips: api.zips,
     pendingCertification: false,
   };
@@ -232,6 +258,14 @@ function CouncilPhoto({ member, size = "sm" }) {
 }
 
 function CouncilMemberBadge({ councilMember, attribution }) {
+  // These three chips are driven by event.attribution, an NYC-shaped enum the
+  // backend only sets for NYC events — so they never render for a NJ ZIP and
+  // can't mislabel a NJ rep. The literals "22 Council Members" and the
+  // per-district "district_3" case are NYC-specific and NOT yet data-driven: the
+  // participant count isn't in the API, so making them jurisdiction-general
+  // needs a backend attribution change (tracked, out of scope for this commit).
+  // We do NOT invent a count. The main rep line below ("Rep: {name}") is already
+  // jurisdiction-neutral.
   if (attribution === "statewide") return <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium"><User className="w-3 h-3" /><span>Statewide action</span></div>;
   if (attribution === "multi_council") return <div className="flex items-center gap-1.5 text-[11px] text-stone-500 font-medium"><Users className="w-3 h-3" /><span>22 Council Members participating</span></div>;
   if (attribution === "district_3") return <div className="flex items-center gap-1.5 text-[11px] text-amber-700 font-medium bg-amber-50 px-2 py-0.5 rounded-full"><AlertCircle className="w-3 h-3" /><span>Seat vacant — you choose</span></div>;
@@ -474,19 +508,25 @@ export default function OnYourBlockDashboard() {
             {activeCouncilMember.vacant ? (
               <div className="flex items-center gap-2 text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-lg px-3 py-2" role="status">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-                <span>Your seat in <span className="font-semibold">Council District {activeCouncilMember.districtNum}</span> is currently vacant. A special election is happening now.</span>
+                <span>Your seat in <span className="font-semibold">{activeCouncilMember.jurisdictionLabel}</span> is currently vacant.</span>
               </div>
-            ) : activeCouncilMember.pendingCertification ? (
+            ) : FEATURE_PENDING_CERTIFICATION && activeCouncilMember.pendingCertification ? (
+              // TODO(civic-results): future infrastructure for a "winner declared,
+              // not yet certified" state. Disabled via FEATURE_PENDING_CERTIFICATION
+              // until a real results source drives it — the name/date below are
+              // placeholders, never shown while the flag is off. Kept intentionally;
+              // revisit wiring it up as its own workstream. Uses jurisdictionLabel,
+              // not a hardcoded "District N", when re-enabled.
               <div className="flex items-center gap-2 text-xs bg-sky-50 text-sky-800 border border-sky-200 rounded-lg px-3 py-2" role="status">
                 <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" aria-hidden="true" />
-                <span><span className="font-semibold">Carl Wilson</span> won the District {activeCouncilMember.districtNum} Special Election. Final ranked-choice results expected May 5 — contact info will populate once certified.</span>
+                <span>A winner was declared in <span className="font-semibold">{activeCouncilMember.jurisdictionLabel}</span>. Contact info will populate once results are certified.</span>
               </div>
             ) : (
               <button onClick={() => setShowCouncilMember(true)} className="w-full flex items-center justify-between gap-2 text-xs bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-lg px-3 py-2 transition text-left group focus:outline-none focus:ring-2 focus:ring-stone-400">
                 <div className="flex items-center gap-2 min-w-0">
                   <CouncilPhoto member={activeCouncilMember} />
                   <div className="min-w-0">
-                    <div className="text-stone-500 text-[10px] uppercase tracking-wider font-semibold">{t.yourCouncilMember}</div>
+                    <div className="text-stone-500 text-[10px] uppercase tracking-wider font-semibold">{activeCouncilMember.office ? `Your ${activeCouncilMember.office}` : t.yourCouncilMember}</div>
                     <div className="font-semibold text-stone-900 truncate">{activeCouncilMember.name}</div>
                   </div>
                 </div>
@@ -708,7 +748,7 @@ function EventCard({ event, zip, councilMember, nudged, state, registered, onNud
               <div className="w-6 h-6 rounded-lg bg-violet-200 flex items-center justify-center flex-shrink-0"><FileText className="w-3.5 h-3.5 text-violet-800" aria-hidden="true" /></div>
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-violet-700">Preview your ballot</div>
-                <div className="text-xs text-violet-900 leading-relaxed">{ballotItems.length} projects on your district's ballot</div>
+                <div className="text-xs text-violet-900 leading-relaxed">{ballotItems.length} projects on your ballot</div>
               </div>
               <ChevronRight className={`w-4 h-4 text-violet-600 transition motion-safe:${showBallot ? "rotate-90" : ""}`} aria-hidden="true" />
             </button>
@@ -861,7 +901,7 @@ function ImpactHistoryView({ completedEvents, onEventClick }) {
         <div className="relative">
           <div className="text-xs font-semibold uppercase tracking-wider text-amber-400 mb-1 flex items-center gap-1.5"><RippleIcon className="w-3.5 h-3.5" filled /> Your impact</div>
           <div className="text-4xl font-black tracking-tight mb-1">{completedEvents.length} {completedEvents.length === 1 ? "ripple" : "ripples"}</div>
-          <div className="text-sm text-stone-300 mb-5">Every confirmed action shapes your block, your district, your city.</div>
+          <div className="text-sm text-stone-300 mb-5">Every confirmed action shapes your block, your neighborhood, your city.</div>
           <div className="grid grid-cols-2 gap-3">
             {totalDollars > 0 && <div><div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">Dollars shaped</div><div className="text-2xl font-bold">${totalDollars}M+</div></div>}
             {issueAreas.length > 0 && <div><div className="text-[11px] uppercase tracking-wider text-stone-400 mb-1">Areas touched</div><div className="text-2xl font-bold">{issueAreas.length}</div></div>}
@@ -914,7 +954,7 @@ function LegacyView({ history, zip }) {
       <div className="bg-white rounded-2xl border border-stone-200 p-10 text-center">
         <div className="w-14 h-14 bg-stone-100 rounded-full flex items-center justify-center mx-auto mb-3 text-stone-400"><History className="w-6 h-6" /></div>
         <div className="font-semibold text-stone-800 mb-1">No neighborhood history yet</div>
-        <div className="text-sm text-stone-500 max-w-sm mx-auto leading-relaxed">No PB-funded projects on file for this ZIP. Try a different one — coverage varies by council district.</div>
+        <div className="text-sm text-stone-500 max-w-sm mx-auto leading-relaxed">No civic project history on file for this ZIP yet. Try a different one — coverage varies by area.</div>
       </div>
     );
   }
@@ -1017,7 +1057,7 @@ function CouncilMemberSheet({ member, onClose }) {
       <div className="absolute inset-0 bg-stone-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl">
         <div className="sticky top-0 bg-white/90 backdrop-blur-xl border-b border-stone-100 px-5 py-3 flex items-center justify-between">
-          <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">Your Council Member</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-stone-500">{member.office ? `Your ${member.office}` : "Your Representative"}</div>
           <button onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-full hover:bg-stone-100 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-stone-400"><X className="w-4 h-4 text-stone-500" /></button>
         </div>
         <div className="px-5 py-5">
@@ -1025,7 +1065,7 @@ function CouncilMemberSheet({ member, onClose }) {
             <CouncilPhoto member={member} size="lg" />
             <div className="min-w-0">
               <div className="font-bold text-xl leading-tight tracking-tight">{member.name}</div>
-              <div className="text-sm text-stone-500">District {member.districtNum} · {member.district}</div>
+              <div className="text-sm text-stone-500">{member.jurisdictionLabel}{member.jurisdictionArea ? ` · ${member.jurisdictionArea}` : ""}</div>
             </div>
           </div>
           <div className="space-y-2 mb-5">
@@ -1041,11 +1081,11 @@ function CouncilMemberSheet({ member, onClose }) {
             </a>
             <a href={member.bio} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-xl px-4 py-3 transition focus:outline-none focus:ring-2 focus:ring-stone-400">
               <div className="w-9 h-9 rounded-lg bg-white border border-stone-200 flex items-center justify-center flex-shrink-0"><User className="w-4 h-4 text-stone-700" aria-hidden="true" /></div>
-              <div className="flex-1 min-w-0"><div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Full bio & voting record</div><div className="text-sm font-medium">council.nyc.gov</div></div>
+              <div className="flex-1 min-w-0"><div className="text-[11px] font-semibold uppercase tracking-wider text-stone-500">Full bio & voting record</div><div className="text-sm font-medium">{hostnameOf(member.bio)}</div></div>
               <ArrowUpRight className="w-4 h-4 text-stone-400 flex-shrink-0" aria-hidden="true" />
             </a>
           </div>
-          <div className="flex items-start gap-2 text-xs text-stone-500"><Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" aria-hidden="true" /><span>Photo and contact info are publicly listed at council.nyc.gov.</span></div>
+          <div className="flex items-start gap-2 text-xs text-stone-500"><Info className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" aria-hidden="true" /><span>Photo and contact info are publicly listed at {hostnameOf(member.bio)}.</span></div>
         </div>
       </div>
     </div>
