@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { MapPin, Clock, ExternalLink, Calendar, Vote, Users, AlertCircle, Bell, Share2, ChevronRight, Info, Check, CalendarDays, List, DollarSign, TrendingUp, Sparkles, X, BellRing, ArrowUpRight, Mail, Phone, User, ThumbsUp, ThumbsDown, History, MapPinned, Globe, Flag, ShieldCheck, FileText, Heart, ArrowLeft, CheckCircle2, Building2, Accessibility } from "lucide-react";
+import { MapPin, Clock, ExternalLink, Calendar, Vote, Users, AlertCircle, Bell, Share2, ChevronRight, Info, Check, CalendarDays, List, DollarSign, TrendingUp, Sparkles, X, BellRing, ArrowUpRight, Mail, Phone, User, ThumbsUp, ThumbsDown, History, MapPinned, Globe, Flag, ShieldCheck, Heart, ArrowLeft, CheckCircle2, Building2, Accessibility } from "lucide-react";
 
 // Evaluated at module load. Module reloads on browser refresh, which is
 // effectively how often a user re-opens the page; drift across midnight in
@@ -52,41 +52,20 @@ const translations = {
 };
 
 
-// Real ballot items — sampled from actual 2026 PB ballots by district
-const ballotPreviews = {
-  "pb-vote-2026": {
-    note: "Your ballot shows only projects in your district. Here's a sample of what's being voted on.",
-    items: {
-      "10011": [
-        { title: "City Hall Park Lighting Upgrade", cost: "$1,000,000", desc: "Replace the non-functioning gas lights on the City Hall Park fountain with LED lights.", location: "City Hall Park" },
-        { title: "Pier 42 Shade Structures", cost: "$1,000,000", desc: "Install sail shade structures at Pier 42, on the southside of the FDR Drive at Gouverneur Street.", location: "Pier 42" },
-        { title: "Commercial Dishwasher for NYC H+H/Gouverneur", cost: "$350,000", desc: "Commercial dishwasher for the skilled nursing facility at NYC Health + Hospitals/Gouverneur, a 295-bed facility.", location: "277 Madison St" },
-      ],
-      "10024": [
-        { title: "Library Technology Upgrades", cost: "$500,000", desc: "Replace aging public-use computer workstations at St. Agnes, Riverside, and Lincoln Center Performing Arts Library branches.", location: "Multiple UWS libraries" },
-        { title: "John Jay Athletic Facility LED Boards", cost: "$750,000", desc: "Large indoor LED video display boards in the athletic facility at John Jay College of Criminal Justice for athletics and campus programming.", location: "John Jay College" },
-        { title: "PS/IS 276 Playground & Track", cost: "$1,000,000", desc: "Renovate playground and convert track field at Battery Park City School.", location: "PS/IS 276" },
-      ],
-      "default": [
-        { title: "Sample ballot item", cost: "$250,000", desc: "Ballot items vary by district. Enter your Manhattan ZIP to see real 2026 PB ballot samples.", location: "Your district" },
-      ],
-    },
-  },
-};
-
-// Candidates for active elections (real, per ballotpedia.org where possible)
-const candidatesByEvent = {
-  "d3-special-early": [
-    { name: "Keith Powers", party: "Democratic", campaignUrl: "https://www.keithpowersnyc.com/", ballotpediaUrl: "https://ballotpedia.org/Keith_Powers" },
-    { name: "Maria Ortiz", party: "Democratic", campaignUrl: null, ballotpediaUrl: null },
-    { name: "See full ballot", party: null, campaignUrl: "https://vote.nyc/", ballotpediaUrl: null, isFallback: true },
-  ],
-  "d3-special-day": [
-    { name: "Keith Powers", party: "Democratic", campaignUrl: "https://www.keithpowersnyc.com/", ballotpediaUrl: "https://ballotpedia.org/Keith_Powers" },
-    { name: "Maria Ortiz", party: "Democratic", campaignUrl: null, ballotpediaUrl: null },
-    { name: "See full ballot", party: null, campaignUrl: "https://vote.nyc/", ballotpediaUrl: null, isFallback: true },
-  ],
-};
+// Map an API candidate row (snake_case) to the shape the candidates panel
+// consumes. Candidates are served per-event from /v1/candidates and exist
+// only once an official (certified) candidate list has been entered in the
+// backend's data/candidates/ — never populated from news media.
+function transformApiCandidate(api) {
+  return {
+    id: api.id,
+    name: api.name,
+    party: api.party,
+    campaignUrl: api.campaign_url,
+    ballotpediaUrl: api.ballotpedia_url,
+    incumbent: api.incumbent ?? false,
+  };
+}
 
 // Format an API outcome_status enum into the editorial label LegacyCard expects
 // ("Funded for FY2026", "Completed 2024"). Pulls year from outcome_date or
@@ -189,7 +168,9 @@ function transformApiEvent(api) {
     isRegistrationGate: api.is_registration_gate ?? false,
     isResult: api.is_result ?? false,
     attribution: api.attribution ?? null,
-    hasBallot: api.has_ballot ?? false,
+    // The API also sends has_ballot, but there's no ballot-items endpoint
+    // yet — nothing to render from it, so it stays unmapped until one exists.
+    hasCandidates: api.has_candidates ?? false,
     impact: api.impact ?? null,
     calendar: api.event_start && api.event_end
       ? { start: api.event_start, end: api.event_end }
@@ -620,7 +601,7 @@ export default function OnYourBlockDashboard() {
                 <EmptyState t={t} />
               ) : (
                 events.map((event) => (
-                  <EventCard key={event.id} event={event} zip={zip} councilMember={councilMember} nudged={nudged.has(event.id)} state={actionStates.get(event.id)} registered={registered} onNudge={() => toggleNudge(event.id)} onIntent={() => recordIntent(event)} onConfirm={(didAttend) => confirmAttendance(event.id, didAttend)} onImpact={() => setShowImpact(event.id)} t={t} />
+                  <EventCard key={event.id} event={event} councilMember={councilMember} nudged={nudged.has(event.id)} state={actionStates.get(event.id)} registered={registered} onNudge={() => toggleNudge(event.id)} onIntent={() => recordIntent(event)} onConfirm={(didAttend) => confirmAttendance(event.id, didAttend)} onImpact={() => setShowImpact(event.id)} t={t} />
                 ))
               )}
             </div>
@@ -700,9 +681,9 @@ function Pill({ active, onClick, label, count }) {
   );
 }
 
-function EventCard({ event, zip, councilMember, nudged, state, registered, onNudge, onIntent, onConfirm, onImpact, t }) {
-  const [showBallot, setShowBallot] = useState(false);
+function EventCard({ event, councilMember, nudged, state, registered, onNudge, onIntent, onConfirm, onImpact, t }) {
   const [showCandidates, setShowCandidates] = useState(false);
+  const [candidates, setCandidates] = useState([]);
   const urgency = urgencyMeta[event.urgency];
   const cat = categoryMeta[event.category] ?? fallbackCategoryMeta;
   const Icon = cat.icon;
@@ -711,10 +692,37 @@ function EventCard({ event, zip, councilMember, nudged, state, registered, onNud
   const isPending = status === "pending_confirmation";
   const isMissed = status === "confirmed_missed";
 
+  // Fetches the ballot-line candidates for events the API flags. Fetch on
+  // mount rather than on expand so the collapsed header shows a real count;
+  // flagged events are rare (a handful of election cards a year), so this
+  // stays within the minimize-API-pulls rule. A flagged event whose official
+  // candidate list isn't certified yet returns zero rows — the panel simply
+  // doesn't render, same as a failed fetch.
+  useEffect(() => {
+    if (!event.hasCandidates) return;
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    if (!baseUrl) return;
+    let cancelled = false;
+    fetch(`${baseUrl}/v1/candidates?event_id=${encodeURIComponent(event.id)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setCandidates((data?.candidates ?? []).map(transformApiCandidate));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCandidates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [event.id, event.hasCandidates]);
+
   const actionLabel = event.requiresRegistration && registered && event.action.toLowerCase().includes("register") ? t.voteNow : event.action;
   const mainButtonLabel = isConfirmed ? t.acted : isMissed ? "View details" : actionLabel;
-  const ballotItems = event.hasBallot ? (ballotPreviews[event.id]?.items[zip] || ballotPreviews[event.id]?.items["default"] || []) : [];
-  const candidates = candidatesByEvent[event.id];
 
   return (
     <article className={`group bg-white rounded-2xl border overflow-hidden transition-all ${isConfirmed ? "border-emerald-200 bg-emerald-50/30" : isMissed ? "border-stone-200 opacity-70" : event.urgency === "critical" ? "border-rose-200 shadow-sm shadow-rose-100/50" : "border-stone-200 hover:border-stone-300 hover:shadow-md"}`}>
@@ -754,52 +762,26 @@ function EventCard({ event, zip, councilMember, nudged, state, registered, onNud
           </div>
         </button>
 
-        {/* Ballot preview — expandable */}
-        {event.hasBallot && ballotItems.length > 0 && (
-          <div className="mb-3">
-            <button onClick={() => setShowBallot(!showBallot)} aria-expanded={showBallot} className="w-full text-left bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl px-3 py-2.5 transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-violet-400">
-              <div className="w-6 h-6 rounded-lg bg-violet-200 flex items-center justify-center flex-shrink-0"><FileText className="w-3.5 h-3.5 text-violet-800" aria-hidden="true" /></div>
-              <div className="flex-1 min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-violet-700">Preview your ballot</div>
-                <div className="text-xs text-violet-900 leading-relaxed">{ballotItems.length} projects on your ballot</div>
-              </div>
-              <ChevronRight className={`w-4 h-4 text-violet-600 transition motion-safe:${showBallot ? "rotate-90" : ""}`} aria-hidden="true" />
-            </button>
-            {showBallot && (
-              <div className="mt-2 space-y-2 pl-2">
-                {ballotItems.map((item, idx) => (
-                  <div key={idx} className="bg-white border border-violet-100 rounded-lg p-3">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <div className="font-semibold text-sm leading-tight flex-1">{item.title}</div>
-                      <div className="text-xs font-bold text-violet-700 flex-shrink-0">{item.cost}</div>
-                    </div>
-                    <div className="text-xs text-stone-600 mb-1 leading-relaxed">{item.desc}</div>
-                    <div className="text-[11px] text-stone-500 flex items-center gap-1"><MapPin className="w-3 h-3" aria-hidden="true" /> {item.location}</div>
-                  </div>
-                ))}
-                <div className="text-[11px] text-violet-700 pt-1">{ballotPreviews[event.id].note}</div>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Candidate info — link-out only */}
-        {candidates && (
+        {candidates.length > 0 && (
           <div className="mb-3">
             <button onClick={() => setShowCandidates(!showCandidates)} aria-expanded={showCandidates} className="w-full text-left bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl px-3 py-2.5 transition flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
               <div className="w-6 h-6 rounded-lg bg-indigo-200 flex items-center justify-center flex-shrink-0"><Users className="w-3.5 h-3.5 text-indigo-800" aria-hidden="true" /></div>
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">Who's on the ballot</div>
-                <div className="text-xs text-indigo-900 leading-relaxed">{candidates.filter(c => !c.isFallback).length} candidates · links to their own sites</div>
+                <div className="text-xs text-indigo-900 leading-relaxed">{candidates.length} {candidates.length === 1 ? "candidate" : "candidates"} · links to their own sites</div>
               </div>
               <ChevronRight className={`w-4 h-4 text-indigo-600 transition motion-safe:${showCandidates ? "rotate-90" : ""}`} aria-hidden="true" />
             </button>
             {showCandidates && (
               <div className="mt-2 space-y-1.5 pl-2">
-                {candidates.map((c, idx) => (
-                  <div key={idx} className={`flex items-center justify-between gap-2 bg-white border border-indigo-100 rounded-lg px-3 py-2 ${c.isFallback ? "italic" : ""}`}>
+                {candidates.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-2 bg-white border border-indigo-100 rounded-lg px-3 py-2">
                     <div className="min-w-0">
-                      <div className="font-semibold text-sm truncate">{c.name}</div>
+                      <div className="font-semibold text-sm truncate">
+                        {c.name}
+                        {c.incumbent && <span className="ml-1.5 text-[10px] font-medium text-stone-500 uppercase tracking-wider">Incumbent</span>}
+                      </div>
                       {c.party && <div className="text-[11px] text-stone-500">{c.party}</div>}
                     </div>
                     <div className="flex items-center gap-1">
