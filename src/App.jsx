@@ -52,6 +52,15 @@ const translations = {
 };
 
 
+// Session-lifetime cache of fetched candidate lists, keyed by event id.
+// EventCards remount on every feed↔calendar toggle and filter round trip;
+// without this each remount refires /v1/candidates and flashes the panel
+// out while the request is in flight. Candidate lists change only on a
+// backend redeploy (curated YAML), so page-reload staleness is the same
+// cadence as the data itself. Empty lists are cached too — an uncertified
+// election shouldn't be re-polled on every tab switch.
+const candidatesCache = new Map();
+
 // Map an API candidate row (snake_case) to the shape the candidates panel
 // consumes. Candidates are served per-event from /v1/candidates and exist
 // only once an official (certified) candidate list has been entered in the
@@ -683,7 +692,20 @@ function Pill({ active, onClick, label, count }) {
 
 function EventCard({ event, councilMember, nudged, state, registered, onNudge, onIntent, onConfirm, onImpact, t }) {
   const [showCandidates, setShowCandidates] = useState(false);
-  const [candidates, setCandidates] = useState([]);
+  // Seed from the cache so a remounted card renders its panel synchronously
+  // instead of flashing empty while the request round-trips. Gated on the
+  // flag so an unflagged card never seeds from a stale entry.
+  const [candidates, setCandidates] = useState(() => (event.hasCandidates ? candidatesCache.get(event.id) ?? [] : []));
+  // A live card instance can watch its flag flip without remounting — the
+  // same event id is served across a ZIP switch after the backend flags or
+  // retracts a list. Adjust during render (React's derived-state pattern,
+  // not an effect): a retraction must clear immediately rather than keep
+  // rendering withdrawn civic data, and a fresh flag re-seeds from cache.
+  const [prevHasCandidates, setPrevHasCandidates] = useState(event.hasCandidates);
+  if (prevHasCandidates !== event.hasCandidates) {
+    setPrevHasCandidates(event.hasCandidates);
+    setCandidates(event.hasCandidates ? candidatesCache.get(event.id) ?? [] : []);
+  }
   const urgency = urgencyMeta[event.urgency];
   const cat = categoryMeta[event.category] ?? fallbackCategoryMeta;
   const Icon = cat.icon;
@@ -694,12 +716,13 @@ function EventCard({ event, councilMember, nudged, state, registered, onNudge, o
 
   // Fetches the ballot-line candidates for events the API flags. Fetch on
   // mount rather than on expand so the collapsed header shows a real count;
-  // flagged events are rare (a handful of election cards a year), so this
-  // stays within the minimize-API-pulls rule. A flagged event whose official
-  // candidate list isn't certified yet returns zero rows — the panel simply
-  // doesn't render, same as a failed fetch.
+  // flagged events are rare (a handful of election cards a year) and the
+  // session cache absorbs remounts, so this stays within the
+  // minimize-API-pulls rule. A flagged event whose official candidate list
+  // isn't certified yet returns zero rows — the panel simply doesn't render,
+  // same as a failed fetch (failures aren't cached, so a remount retries).
   useEffect(() => {
-    if (!event.hasCandidates) return;
+    if (!event.hasCandidates || candidatesCache.has(event.id)) return;
     const baseUrl = import.meta.env.VITE_API_BASE_URL;
     if (!baseUrl) return;
     let cancelled = false;
@@ -710,7 +733,9 @@ function EventCard({ event, councilMember, nudged, state, registered, onNudge, o
       })
       .then((data) => {
         if (cancelled) return;
-        setCandidates((data?.candidates ?? []).map(transformApiCandidate));
+        const list = (data?.candidates ?? []).map(transformApiCandidate);
+        candidatesCache.set(event.id, list);
+        setCandidates(list);
       })
       .catch(() => {
         if (cancelled) return;
